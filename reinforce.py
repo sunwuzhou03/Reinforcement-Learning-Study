@@ -89,7 +89,7 @@ if __name__ == "__main__":
     algorithm_name = "REINFORCE"
     gamma = 0.98
 
-    num_episodes = 1000
+    num_episodes = 5000
     learning_rate = 2e-3
     device = torch.device('cuda')
 

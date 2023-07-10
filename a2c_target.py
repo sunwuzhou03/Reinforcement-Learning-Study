@@ -74,37 +74,32 @@ class AC:
                                     param.data * self.tau)
 
     def update(self, transition_dict):
-        reward = transition_dict['rewards']
-        state = transition_dict['states']
-        next_state = transition_dict['next_states']
-        action = transition_dict['actions']
-        next_action = transition_dict['next_actions']
-        done = transition_dict['dones']
+        rewards = torch.tensor(transition_dict['rewards'],
+                               dtype=torch.float).view(-1, 1).to(self.device)
+        states = torch.tensor(transition_dict['states'],
+                              dtype=torch.float).to(self.device)
+        actions = torch.tensor(transition_dict['actions']).view(-1, 1).to(
+            self.device)
+        next_states = torch.tensor(transition_dict['next_states'],
+                                   dtype=torch.float).to(self.device)
+        next_actions = torch.tensor(transition_dict['next_actions']).view(
+            -1, 1).to(self.device)
+        dones = torch.tensor(transition_dict['dones'],
+                             dtype=torch.float).to(self.device).view(-1, 1)
+
+        v_now = self.critic(states).view(-1, 1)
+        v_next = self.critic_target(next_states).view(-1, 1)
+        y_now = (self.gamma * v_next * (1 - dones) + rewards).view(-1, 1)
+        td_delta = y_now - v_now
+        log_prob = torch.log(self.actor(states).gather(1, actions))
+
+        actor_loss = torch.mean(-log_prob * td_delta.detach())
+        critic_loss = torch.mean(F.mse_loss(y_now.detach(), v_now))
+
         self.actor_optimizer.zero_grad()
         self.critic_optimizer.zero_grad()
-        reward = torch.tensor([reward],
-                              dtype=torch.float).view(-1, 1).to(self.device)
-        state = torch.tensor([state], dtype=torch.float).to(self.device)
-        action = torch.tensor([action]).view(-1, 1).to(self.device)
-        next_state = torch.tensor([next_state],
-                                  dtype=torch.float).to(self.device)
-        next_action = torch.tensor([next_action]).view(-1, 1).to(self.device)
-        done = torch.tensor(done,
-                            dtype=torch.float).to(self.device).view(-1, 1)
-        v_now = self.critic(state).view(-1, 1)
-        v_next = self.critic_target(next_state).view(-1, 1)
-        # y_now = self.gamma * v_next + reward
-        y_now = (self.gamma * v_next + reward).view(-1, 1)
-        # print(y_now)
-        # print(q_next)
-        td_delta = y_now - v_now
-        log_prob = torch.log(self.actor(state).gather(1, action))
-        # print(log_prob)
-        # print(action)
-        actor_loss = torch.mean(-log_prob * td_delta.detach())
-        actor_loss.backward()
 
-        critic_loss = torch.mean(F.mse_loss(y_now, v_now))
+        actor_loss.backward()
         critic_loss.backward()
 
         self.actor_optimizer.step()
@@ -134,12 +129,6 @@ def plot_smooth_reward(rewards, window_size=100):
 
 if __name__ == "__main__":
 
-    gamma = 0.99
-    algorithm_name = "demo"
-    num_episodes = 1000
-    actor_lr = 1e-3
-    critic_lr = 2e-3
-    device = torch.device('cuda')
     env_name = 'Snake-v0'  #'CartPole-v0'
 
     # 注册环境
@@ -151,17 +140,23 @@ if __name__ == "__main__":
     np.random.seed(0)
     env.seed(0)
     torch.manual_seed(0)
-
+    gamma = 0.99
+    algorithm_name = "A2C_TARGET"
+    num_episodes = 5000
+    actor_lr = 1e-3
+    critic_lr = 1e-3
+    tau = 5e-3
+    device = torch.device('cuda')
     state_dim = env.observation_space.shape[0]
     hidden_dim = 128
     action_dim = env.action_space.n
-    tau = 5e-4
+
     agent = AC(state_dim, hidden_dim, action_dim, actor_lr, critic_lr, gamma,
                tau, device)
 
     return_list = []
     max_reward = 0
-    for i in range(30):
+    for i in range(20):
         with tqdm(total=int(num_episodes / 10),
                   desc='Iteration %d' % i) as pbar:
             for i_episodes in range(int(num_episodes / 10)):
@@ -169,27 +164,33 @@ if __name__ == "__main__":
                 state = env.reset()
                 done = False
 
+                transition_dict = {
+                    'states': [],
+                    'actions': [],
+                    'next_states': [],
+                    'next_actions': [],
+                    'rewards': [],
+                    'dones': []
+                }
+
                 while not done:
                     action = agent.take_action(state)
                     next_state, reward, done, _ = env.step(action)
                     next_action = agent.take_action(next_state)
                     env.render()
 
-                    transition_dict = {
-                        'states': state,
-                        'actions': action,
-                        'next_states': next_state,
-                        'next_actions': next_action,
-                        'rewards': reward,
-                        'dones': done
-                    }
-
-                    agent.update(transition_dict)
+                    transition_dict['states'].append(state)
+                    transition_dict['actions'].append(action)
+                    transition_dict['next_states'].append(next_state)
+                    transition_dict['next_actions'].append(next_action)
+                    transition_dict['rewards'].append(reward)
+                    transition_dict['dones'].append(done)
 
                     state = next_state
                     episode_return += reward
                     if i_episodes == int(num_episodes / 10) - 1:
                         time.sleep(0.1)
+                agent.update(transition_dict)
 
                 return_list.append(episode_return)
                 if episode_return > max_reward:

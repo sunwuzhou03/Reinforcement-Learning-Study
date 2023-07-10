@@ -115,9 +115,9 @@ def plot_smooth_reward(rewards, window_size=100):
 
 if __name__ == "__main__":
 
-    gamma = 0.98
+    gamma = 0.99
     algorithm_name = "REINFORCE_baseline"
-    num_episodes = 1000
+    num_episodes = 5000
     learning_rate = 2e-3
     device = torch.device('cuda')
 
