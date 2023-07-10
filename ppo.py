@@ -11,11 +11,22 @@ import time
 import torch.nn as nn
 
 
+def compute_advantage(gamma, lmbda, td_delta):
+    td_delta = td_delta.detach().numpy()
+    advantage_list = []
+    advantage = 0.0
+    for delta in td_delta[::-1]:
+        advantage = gamma * lmbda * advantage + delta
+        advantage_list.append(advantage)
+    advantage_list.reverse()
+    return torch.tensor(advantage_list, dtype=torch.float)
+
+
 class CriticNet(nn.Module):
     def __init__(self, state_dim, hidden_dim, action_dim) -> None:
         super().__init__()
         self.fc1 = torch.nn.Linear(state_dim, hidden_dim)
-        self.fc2 = torch.nn.Linear(hidden_dim, action_dim)
+        self.fc2 = torch.nn.Linear(hidden_dim, 1)
 
     def forward(self, state):
         hidden_state = F.relu(self.fc1(state))
@@ -37,12 +48,15 @@ class ActorNet(nn.Module):
         return probs
 
 
-class AC:
+class PPO:
     def __init__(self, state_dim, hidden_dim, action_dim, actor_lr, critic_lr,
-                 gamma, device) -> None:
+                 gamma, lmbda, eps, epochs, device) -> None:
         self.actor = ActorNet(state_dim, hidden_dim, action_dim).to(device)
         self.critic = CriticNet(state_dim, hidden_dim, action_dim).to(device)
         self.gamma = gamma
+        self.lmbda = lmbda
+        self.eps = eps
+        self.epochs = epochs
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(),
                                                 lr=actor_lr)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(),
@@ -76,21 +90,31 @@ class AC:
         dones = torch.tensor(transition_dict['dones'],
                              dtype=torch.float).to(self.device).view(-1, 1)
 
-        q_now = self.critic(states).gather(1, actions).view(-1, 1)
-        q_next = self.critic(next_states).gather(1, next_actions).view(-1, 1)
+        v_now = self.critic(states).view(-1, 1)
+        v_next = self.critic(next_states).view(-1, 1)
+        y_now = (self.gamma * v_next * (1 - dones) + rewards).view(-1, 1)
+        td_delta = y_now - v_now
+        advantage = compute_advantage(self.gamma, self.lmbda,
+                                      td_delta.cpu()).to(self.device)
+        old_log_probs = torch.log(self.actor(states).gather(1,
+                                                            actions)).detach()
+        for _ in range(self.epochs):
+            log_probs = torch.log(self.actor(states).gather(1, actions))
+            ratio = torch.exp(log_probs - old_log_probs)
+            surr1 = ratio * advantage
+            surr2 = torch.clamp(ratio, 1 - self.eps, 1 + self.eps)
+            actor_loss = torch.mean(-torch.min(surr1, surr2))
+            critic_loss = torch.mean(
+                F.mse_loss(self.critic(states), y_now.detach()))
 
-        y_now = (self.gamma * q_next * (1 - dones) + rewards).view(-1, 1)
-        td_delta = y_now - q_now
-        log_prob = torch.log(self.actor(states).gather(1, actions))
-        actor_loss = torch.mean(-log_prob * td_delta.detach())
-        critic_loss = torch.mean(F.mse_loss(y_now.detach(), q_now))
+            self.actor_optimizer.zero_grad()
+            self.critic_optimizer.zero_grad()
 
-        self.actor_optimizer.zero_grad()
-        self.critic_optimizer.zero_grad()
-        actor_loss.backward()
-        critic_loss.backward()
-        self.actor_optimizer.step()
-        self.critic_optimizer.step()
+            actor_loss.backward()
+            critic_loss.backward()
+
+            self.actor_optimizer.step()
+            self.critic_optimizer.step()
 
 
 def plot_smooth_reward(rewards, window_size=100):
@@ -116,14 +140,14 @@ def plot_smooth_reward(rewards, window_size=100):
 if __name__ == "__main__":
 
     gamma = 0.99
-    algorithm_name = "demo"
+    algorithm_name = "PPO"
     num_episodes = 5000
-
     actor_lr = 1e-3
-    critic_lr = 4e-3
-    print(algorithm_name, actor_lr, critic_lr)
+    critic_lr = 1e-3
+    lmbda = 0.95
+    eps = 0.2
+    epochs = 5
     device = torch.device('cuda')
-
     env_name = 'Snake-v0'  #'CartPole-v0'
 
     # 注册环境
@@ -139,9 +163,8 @@ if __name__ == "__main__":
     state_dim = env.observation_space.shape[0]
     hidden_dim = 128
     action_dim = env.action_space.n
-
-    agent = AC(state_dim, hidden_dim, action_dim, actor_lr, critic_lr, gamma,
-               device)
+    agent = PPO(state_dim, hidden_dim, action_dim, actor_lr, critic_lr, gamma,
+                lmbda, eps, epochs, device)
 
     return_list = []
     max_reward = 0
@@ -161,6 +184,7 @@ if __name__ == "__main__":
                     'rewards': [],
                     'dones': []
                 }
+
                 while not done:
                     action = agent.take_action(state)
                     next_state, reward, done, _ = env.step(action)

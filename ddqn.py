@@ -128,7 +128,7 @@ if __name__ == "__main__":
     algorithm_name = "DDQN"
     gamma = 0.99
 
-    num_episodes = 1000
+    num_episodes = 5000
     buffersize = 10000
     minmal_size = 500
     batch_size = 64
