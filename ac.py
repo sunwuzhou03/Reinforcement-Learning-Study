@@ -9,6 +9,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import time
 import torch.nn as nn
+from rl_utils import plot_smooth_reward
 
 
 class CriticNet(nn.Module):
@@ -93,30 +94,10 @@ class AC:
         self.critic_optimizer.step()
 
 
-def plot_smooth_reward(rewards, window_size=100):
-    # 计算滑动窗口平均值
-    smoothed_rewards = np.convolve(rewards,
-                                   np.ones(window_size) / window_size,
-                                   mode='valid')
-
-    # 绘制原始奖励和平滑奖励曲线
-    plt.plot(rewards, label='Raw Reward')
-    plt.plot(smoothed_rewards, label='Smoothed Reward')
-
-    # 设置图例、标题和轴标签
-    plt.legend()
-    plt.title('Smoothed Reward')
-    plt.xlabel('Episode')
-    plt.ylabel('Reward')
-
-    # 显示图像
-    plt.show()
-
-
 if __name__ == "__main__":
 
     gamma = 0.99
-    algorithm_name = "demo"
+    algorithm_name = "AC"
     num_episodes = 5000
 
     actor_lr = 1e-3
@@ -181,6 +162,7 @@ if __name__ == "__main__":
                 agent.update(transition_dict)
 
                 return_list.append(episode_return)
+                plot_smooth_reward(return_list, 100, env_name, algorithm_name)
                 if episode_return > max_reward:
                     max_reward = episode_return
                     agent.save_model(env_name, algorithm_name)

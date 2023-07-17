@@ -12,6 +12,17 @@ import torch.nn as nn
 from rl_utils import plot_smooth_reward
 
 
+def compute_advantage(gamma, lmbda, td_delta):
+    td_delta = td_delta.detach().numpy()
+    advantage_list = []
+    advantage = 0.0
+    for delta in td_delta[::-1]:
+        advantage = gamma * lmbda * advantage + delta
+        advantage_list.append(advantage)
+    advantage_list.reverse()
+    return torch.tensor(advantage_list, dtype=torch.float)
+
+
 class CriticNet(nn.Module):
     def __init__(self, state_dim, hidden_dim, action_dim) -> None:
         super().__init__()
@@ -28,22 +39,26 @@ class ActorNet(nn.Module):
     def __init__(self, state_dim, hidden_dim, action_dim) -> None:
         super().__init__()
         self.fc1 = nn.Linear(state_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, action_dim)
+        self.fc_mu = nn.Linear(hidden_dim, action_dim)
+        self.fc_std = nn.Linear(hidden_dim, action_dim)
 
     def forward(self, state):
 
         hidden_state = F.relu(self.fc1(state))
-        # print(self.fc2(hidden_state))
-        probs = F.softmax(self.fc2(hidden_state), dim=1)
-        return probs
+        mu = 2.0 * F.tanh(self.fc_mu(hidden_state))
+        sigma = F.softplus(self.fc_std(hidden_state))
+        return mu, sigma
 
 
-class A2C:
+class PPO:
     def __init__(self, state_dim, hidden_dim, action_dim, actor_lr, critic_lr,
-                 gamma, device) -> None:
+                 gamma, lmbda, eps, epochs, device) -> None:
         self.actor = ActorNet(state_dim, hidden_dim, action_dim).to(device)
         self.critic = CriticNet(state_dim, hidden_dim, action_dim).to(device)
         self.gamma = gamma
+        self.lmbda = lmbda
+        self.eps = eps
+        self.epochs = epochs
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(),
                                                 lr=actor_lr)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(),
@@ -58,13 +73,13 @@ class A2C:
 
     def take_action(self, state):
         state = torch.tensor([state], dtype=torch.float).to(self.device)
-        probs = self.actor(state)
-        action_dist = torch.distributions.Categorical(probs)
+        mu, sigma = self.actor(state)
+        action_dist = torch.distributions.Normal(mu, sigma)
         action = action_dist.sample()
-        return action.item()
+        # print(action)
+        return action.cpu().numpy().flatten()
 
     def update(self, transition_dict):
-
         rewards = torch.tensor(transition_dict['rewards'],
                                dtype=torch.float).view(-1, 1).to(self.device)
         states = torch.tensor(transition_dict['states'],
@@ -79,56 +94,50 @@ class A2C:
                              dtype=torch.float).to(self.device).view(-1, 1)
 
         v_now = self.critic(states).view(-1, 1)
-
         v_next = self.critic(next_states).view(-1, 1)
-
         y_now = (self.gamma * v_next * (1 - dones) + rewards).view(-1, 1)
         td_delta = y_now - v_now
-        log_prob = torch.log(self.actor(states).gather(1, actions))
+        advantage = compute_advantage(self.gamma, self.lmbda,
+                                      td_delta.cpu()).to(self.device)
+        mu, sigma = self.actor(states)
+        action_dists = torch.distributions.Normal(mu.detach(), sigma.detach())
+        old_log_probs = action_dists.log_prob(actions)
+        for _ in range(self.epochs):
 
-        actor_loss = torch.mean(-log_prob * td_delta.detach())
-        critic_loss = torch.mean(F.mse_loss(y_now.detach(), v_now))
+            mu, sigma = self.actor(states)
+            action_dists = torch.distributions.Normal(mu, sigma)
+            log_probs = action_dists.log_prob(actions)
 
-        self.actor_optimizer.zero_grad()
-        self.critic_optimizer.zero_grad()
+            ratio = torch.exp(log_probs - old_log_probs)
+            surr1 = ratio * advantage
+            surr2 = torch.clamp(ratio, 1 - self.eps, 1 + self.eps) * advantage
+            actor_loss = torch.mean(-torch.min(surr1, surr2))
+            critic_loss = torch.mean(
+                F.mse_loss(self.critic(states), y_now.detach()))
 
-        actor_loss.backward()
-        critic_loss.backward()
+            self.actor_optimizer.zero_grad()
+            self.critic_optimizer.zero_grad()
 
-        self.actor_optimizer.step()
-        self.critic_optimizer.step()
+            actor_loss.backward()
+            critic_loss.backward()
 
-
-def plot_smooth_reward(rewards, window_size=100):
-    # 计算滑动窗口平均值
-    smoothed_rewards = np.convolve(rewards,
-                                   np.ones(window_size) / window_size,
-                                   mode='valid')
-
-    # 绘制原始奖励和平滑奖励曲线
-    plt.plot(rewards, label='Raw Reward')
-    plt.plot(smoothed_rewards, label='Smoothed Reward')
-
-    # 设置图例、标题和轴标签
-    plt.legend()
-    plt.title('Smoothed Reward')
-    plt.xlabel('Episode')
-    plt.ylabel('Reward')
-
-    # 显示图像
-    plt.show()
+            self.actor_optimizer.step()
+            self.critic_optimizer.step()
 
 
 if __name__ == "__main__":
 
-    gamma = 0.99
-    algorithm_name = "A2C"
-    num_episodes = 5000
-    actor_lr = 1e-3
-    critic_lr = 1e-3
+    gamma = 0.9
+    algorithm_name = "PPOdemo"
+    num_episodes = 2000
+    actor_lr = 1e-4
+    critic_lr = 5e-3
+    lmbda = 0.9
+    eps = 0.2
+    epochs = 10
     device = torch.device('cuda')
-    env_name = 'Snake-v0'  #'CartPole-v0'
-
+    env_name = 'Pendulum-v1'  #'CartPole-v0'
+    max_step = 500
     # 注册环境
     gym.register(id='Snake-v0', entry_point='snake_env:SnakeEnv')
 
@@ -141,19 +150,21 @@ if __name__ == "__main__":
 
     state_dim = env.observation_space.shape[0]
     hidden_dim = 128
-    action_dim = env.action_space.n
-    agent = A2C(state_dim, hidden_dim, action_dim, actor_lr, critic_lr, gamma,
-                device)
+    action_dim = env.action_space.shape[0]
+    agent = PPO(state_dim, hidden_dim, action_dim, actor_lr, critic_lr, gamma,
+                lmbda, eps, epochs, device)
 
     return_list = []
-    max_reward = 0
-    for i in range(20):
+    inf = float('inf')
+    max_reward = -inf
+    for i in range(10):
         with tqdm(total=int(num_episodes / 10),
                   desc='Iteration %d' % i) as pbar:
             for i_episodes in range(int(num_episodes / 10)):
                 episode_return = 0
                 state = env.reset()
                 done = False
+
                 transition_dict = {
                     'states': [],
                     'actions': [],
@@ -163,23 +174,24 @@ if __name__ == "__main__":
                     'dones': []
                 }
 
-                while not done:
+                for _ in range(max_step):
                     action = agent.take_action(state)
                     next_state, reward, done, _ = env.step(action)
                     next_action = agent.take_action(next_state)
-                    env.render()
-
                     transition_dict['states'].append(state)
                     transition_dict['actions'].append(action)
                     transition_dict['next_states'].append(next_state)
                     transition_dict['next_actions'].append(next_action)
-                    transition_dict['rewards'].append(reward)
+                    transition_dict['rewards'].append((reward + 8.0) / 8.0)
                     transition_dict['dones'].append(done)
 
                     state = next_state
                     episode_return += reward
                     if i_episodes == int(num_episodes / 10) - 1:
+                        env.render()
                         time.sleep(0.1)
+                    if done:
+                        break
                 agent.update(transition_dict)
 
                 return_list.append(episode_return)

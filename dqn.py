@@ -99,7 +99,7 @@ class ReplayBuffer:
 
 gamma = 0.99
 
-num_episodes = 1000
+num_episodes = 10000
 buffersize = 10000
 minmal_size = 500
 batch_size = 64
@@ -127,7 +127,7 @@ agent = DQN(state_dim, hidden_dim, action_dim, learning_rate, gamma, epsilon,
 
 return_list = []
 max_reward = 0
-for i in range(20):
+for i in range(10):
     with tqdm(total=int(num_episodes / 10), desc='Iteration %d' % i) as pbar:
         for i_episodes in range(int(num_episodes / 10)):
             episode_return = 0
@@ -137,8 +137,9 @@ for i in range(20):
                 action = agent.take_action(
                     torch.tensor(state, dtype=torch.float).to(device))
                 next_state, reward, done, _ = env.step(action)
-                env.render()
+
                 if i_episodes == int(num_episodes / 10) - 1:
+                    env.render()
                     time.sleep(0.1)
                 replay_buffer.add(state, action, reward, next_state, done)
                 state = next_state
@@ -148,6 +149,7 @@ for i in range(20):
 
                     agent.update(b_s, b_a, b_r, b_ns, b_d)
             return_list.append(episode_return)
+            plot_smooth_reward(return_list, 100, env_name, algorithm_name)
             if episode_return > max_reward:
                 max_reward = episode_return
                 agent.save_model(env_name, algorithm_name)
@@ -159,5 +161,3 @@ for i in range(20):
                     '%.3f' % np.mean(return_list[-10:])
                 })
             pbar.update(1)
-
-plot_smooth_reward(return_list)

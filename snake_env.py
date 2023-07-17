@@ -20,14 +20,14 @@ class SnakeEnv(gym.Env):
         self.window_size = (self.width * self.cell_size,
                             self.height * self.cell_size)
 
-        # 初始化pygame窗口
-        pygame.init()
-        pygame.font.init()
-        self.font = pygame.font.Font(None, 30)
+        # # 初始化pygame窗口
+        # pygame.init()
+        # pygame.font.init()
+        # self.font = pygame.font.Font(None, 30)
 
-        self.window = pygame.display.set_mode(self.window_size)
+        # self.window = pygame.display.set_mode(self.window_size)
 
-        pygame.display.set_caption("Snake Game")
+        # pygame.display.set_caption("Snake Game")
 
         # 定义颜色
         self.color_bg = (255, 255, 255)
@@ -36,29 +36,11 @@ class SnakeEnv(gym.Env):
         self.color_food = (255, 0, 0)
 
         # 定义贪吃蛇环境的观测空间和行动空间
-        # self.observation_space = gym.spaces.Box(low=0,
-        #                                         high=1,
-        #                                         shape=(self.height *
-        #                                                self.width, 1),
-        #                                         dtype=np.uint8)
-
-        low = np.array([-1.0, -1.0, 0, 0, 0, 0])  # 连续状态空间的最小值
-        high = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])  # 连续状态空间的最大值
-
-        # discrete_space = gym.spaces.MultiDiscrete(n_discrete_states)
+        inf = self.width + self.height
+        low = np.array([-inf, -1.0, 0, 0, 0, 0])  # 连续状态空间的最小值
+        high = np.array([inf, 1.0, 1.0, 1.0, 1.0, 1.0])  # 连续状态空间的最大值
         continuous_space = gym.spaces.Box(low, high, shape=(6, ), dtype=float)
-
         self.observation_space = continuous_space
-
-        # n_discrete_states = [2, 2, 2, 2]  # 离散状态的数量
-        # low = [-1.0, -1.0]  # 连续状态空间的最小值
-        # high = [1.0, 1.0]  # 连续状态空间的最大值
-
-        # discrete_space = gym.spaces.MultiDiscrete(n_discrete_states)
-        # continuous_space = gym.spaces.Box(low, high, shape=(2, ), dtype=float)
-
-        # self.observation_space = gym.spaces.Tuple(
-        #     (continuous_space, discrete_space))
 
         self.action_space = gym.spaces.Discrete(4)
 
@@ -156,11 +138,26 @@ class SnakeEnv(gym.Env):
             self.time += 1
         return self.get_state(), reward, done, {}
 
-    def render(self):
+    def render(self, mode='human'):
+        # 初始化pygame窗口
+        pygame.init()
+        pygame.font.init()
+        self.font = pygame.font.Font(None, 30)
+
+        self.window = pygame.display.set_mode(self.window_size)
+
+        pygame.display.set_caption("Snake Game")
+
+        if mode == 'rgb_array':
+            surface = pygame.Surface(
+                (self.width * self.cell_size, self.height * self.cell_size))
+            self.window = surface
+
         self.window.fill(self.color_bg)
         snake_length_text = self.font.render("Length: " + str(len(self.snake)),
                                              True, (0, 25, 25))
         self.window.blit(snake_length_text, (0, 0))
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -180,55 +177,6 @@ class SnakeEnv(gym.Env):
 
         pygame.display.flip()
 
-
-# # 创建 SnakeEnv 实例并进行测试
-# env = SnakeEnv()
-
-# obs = env.reset()
-# print("初始观测空间:", obs)
-# print("初始观测空间形状:", obs.shape)
-
-# for _ in range(10):
-#     action = env.action_space.sample()
-#     print("执行动作:", action)
-#     obs, reward, done, _ = env.step(action)
-#     print("观测空间:", obs)
-#     print("奖励:", reward)
-#     print("是否完成:", done)
-#     env.render()
-
-#     if done:
-#         obs = env.reset()
-#         # break
-
-# # 注册环境
-# gym.register(id='Snake-v0', entry_point='snake_env:SnakeEnv')
-
-# # 测试环境
-# env = gym.make('Snake-v0', width=5, height=5)
-
-# print(env.observation_space.shape[0])
-# print(env.action_space.n)
-
-# obs = env.reset()
-# done = False
-
-# while not done:
-#     action = env.action_space.sample()  # 随机选择一个行动
-#     obs, reward, done, info = env.step(action)
-#     env.render()
-
-# for _ in range(10000):
-#     action = env.action_space.sample()
-#     print("执行动作:", action)
-#     obs, reward, done, _ = env.step(action)
-#     print("观测空间:", obs)
-#     print("奖励:", reward)
-#     print("是否完成:", done)
-#     # env.render()
-
-#     if done:
-#         obs = env.reset()
-#         # break
-
-# pygame.quit()
+        if mode == 'rgb_array':
+            image_array = pygame.surfarray.array3d(self.window)
+            return image_array

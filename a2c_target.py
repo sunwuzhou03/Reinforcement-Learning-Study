@@ -9,6 +9,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import time
 import torch.nn as nn
+from rl_utils import plot_smooth_reward
 
 
 class CriticNet(nn.Module):
@@ -37,7 +38,7 @@ class ActorNet(nn.Module):
         return probs
 
 
-class AC:
+class A2C_TARGET:
     def __init__(self, state_dim, hidden_dim, action_dim, actor_lr, critic_lr,
                  gamma, tau, device) -> None:
         self.actor = ActorNet(state_dim, hidden_dim, action_dim).to(device)
@@ -107,26 +108,6 @@ class AC:
         self.soft_update(self.critic, self.critic_target)
 
 
-def plot_smooth_reward(rewards, window_size=100):
-    # 计算滑动窗口平均值
-    smoothed_rewards = np.convolve(rewards,
-                                   np.ones(window_size) / window_size,
-                                   mode='valid')
-
-    # 绘制原始奖励和平滑奖励曲线
-    plt.plot(rewards, label='Raw Reward')
-    plt.plot(smoothed_rewards, label='Smoothed Reward')
-
-    # 设置图例、标题和轴标签
-    plt.legend()
-    plt.title('Smoothed Reward')
-    plt.xlabel('Episode')
-    plt.ylabel('Reward')
-
-    # 显示图像
-    plt.show()
-
-
 if __name__ == "__main__":
 
     env_name = 'Snake-v0'  #'CartPole-v0'
@@ -151,8 +132,8 @@ if __name__ == "__main__":
     hidden_dim = 128
     action_dim = env.action_space.n
 
-    agent = AC(state_dim, hidden_dim, action_dim, actor_lr, critic_lr, gamma,
-               tau, device)
+    agent = A2C_TARGET(state_dim, hidden_dim, action_dim, actor_lr, critic_lr,
+                       gamma, tau, device)
 
     return_list = []
     max_reward = 0
@@ -193,6 +174,8 @@ if __name__ == "__main__":
                 agent.update(transition_dict)
 
                 return_list.append(episode_return)
+                plot_smooth_reward(return_list, 100, env_name, algorithm_name)
+
                 if episode_return > max_reward:
                     max_reward = episode_return
                     agent.save_model(env_name, algorithm_name)
@@ -204,5 +187,3 @@ if __name__ == "__main__":
                         '%.3f' % np.mean(return_list[-10:])
                     })
                 pbar.update(1)
-
-    plot_smooth_reward(return_list)

@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import time
+from rl_utils import plot_smooth_reward
 
 
 class Qnet(torch.nn.Module):
@@ -22,7 +23,7 @@ class Qnet(torch.nn.Module):
         return acion_value
 
 
-class DQN:
+class DDQN:
     def __init__(self, state_dim, hidden_dim, action_dim, learning_rate, gamma,
                  epsilon, update_target, device) -> None:
         self.Q = Qnet(state_dim, hidden_dim, action_dim).to(device)
@@ -45,7 +46,7 @@ class DQN:
         self.Q_target.load_state_dict(torch.load(load_path))
 
     def take_action(self, state):
-
+        state = torch.tensor([state], dtype=torch.float).to(self.device)
         Q_value = self.Q(state)
         if np.random.random() < self.epsilon:
             action = np.random.randint(self.action_dim)
@@ -104,28 +105,8 @@ class ReplayBuffer:
         return len(self.buffer)
 
 
-def plot_smooth_reward(rewards, window_size=100):
-    # 计算滑动窗口平均值
-    smoothed_rewards = np.convolve(rewards,
-                                   np.ones(window_size) / window_size,
-                                   mode='valid')
-
-    # 绘制原始奖励和平滑奖励曲线
-    plt.plot(rewards, label='Raw Reward')
-    plt.plot(smoothed_rewards, label='Smoothed Reward')
-
-    # 设置图例、标题和轴标签
-    plt.legend()
-    plt.title('Smoothed Reward')
-    plt.xlabel('Episode')
-    plt.ylabel('Reward')
-
-    # 显示图像
-    plt.show()
-
-
 if __name__ == "__main__":
-    algorithm_name = "DDQN"
+    algorithm_name = "demo"
     gamma = 0.99
 
     num_episodes = 5000
@@ -136,7 +117,7 @@ if __name__ == "__main__":
     learning_rate = 2e-3
     device = torch.device('cuda')
 
-    env_name = 'Snake-v0'
+    env_name = 'CartPole-v0'
     # 注册环境
     gym.register(id='Snake-v0', entry_point='snake_env:SnakeEnv')
 
@@ -151,8 +132,8 @@ if __name__ == "__main__":
     hidden_dim = 128
     action_dim = env.action_space.n
     update_target = 100
-    agent = DQN(state_dim, hidden_dim, action_dim, learning_rate, gamma,
-                epsilon, update_target, device)
+    agent = DDQN(state_dim, hidden_dim, action_dim, learning_rate, gamma,
+                 epsilon, update_target, device)
 
     return_list = []
     max_reward = 0
@@ -164,11 +145,11 @@ if __name__ == "__main__":
                 state = env.reset()
                 done = False
                 while not done:
-                    action = agent.take_action(
-                        torch.tensor(state, dtype=torch.float).to(device))
+                    action = agent.take_action(state)
                     next_state, reward, done, _ = env.step(action)
-                    env.render()
+
                     if i_episodes == int(num_episodes / 10) - 1:
+                        env.render()
                         time.sleep(0.1)
                     replay_buffer.add(state, action, reward, next_state, done)
                     state = next_state
@@ -176,9 +157,9 @@ if __name__ == "__main__":
                     if replay_buffer.size() > minmal_size:
                         b_s, b_a, b_r, b_ns, b_d = replay_buffer.sample(
                             batch_size)
-
                         agent.update(b_s, b_a, b_r, b_ns, b_d)
                 return_list.append(episode_return)
+                plot_smooth_reward(return_list, 100, env_name, algorithm_name)
                 if episode_return > max_reward:
                     max_reward = episode_return
                     agent.save_model(env_name, algorithm_name)
@@ -190,5 +171,3 @@ if __name__ == "__main__":
                         '%.3f' % np.mean(return_list[-10:])
                     })
                 pbar.update(1)
-
-    plot_smooth_reward(return_list)

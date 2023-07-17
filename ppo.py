@@ -9,6 +9,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import time
 import torch.nn as nn
+from rl_utils import plot_smooth_reward
 
 
 def compute_advantage(gamma, lmbda, td_delta):
@@ -102,7 +103,7 @@ class PPO:
             log_probs = torch.log(self.actor(states).gather(1, actions))
             ratio = torch.exp(log_probs - old_log_probs)
             surr1 = ratio * advantage
-            surr2 = torch.clamp(ratio, 1 - self.eps, 1 + self.eps)
+            surr2 = torch.clamp(ratio, 1 - self.eps, 1 + self.eps) * advantage
             actor_loss = torch.mean(-torch.min(surr1, surr2))
             critic_loss = torch.mean(
                 F.mse_loss(self.critic(states), y_now.detach()))
@@ -117,36 +118,16 @@ class PPO:
             self.critic_optimizer.step()
 
 
-def plot_smooth_reward(rewards, window_size=100):
-    # 计算滑动窗口平均值
-    smoothed_rewards = np.convolve(rewards,
-                                   np.ones(window_size) / window_size,
-                                   mode='valid')
-
-    # 绘制原始奖励和平滑奖励曲线
-    plt.plot(rewards, label='Raw Reward')
-    plt.plot(smoothed_rewards, label='Smoothed Reward')
-
-    # 设置图例、标题和轴标签
-    plt.legend()
-    plt.title('Smoothed Reward')
-    plt.xlabel('Episode')
-    plt.ylabel('Reward')
-
-    # 显示图像
-    plt.show()
-
-
 if __name__ == "__main__":
 
     gamma = 0.99
-    algorithm_name = "PPO"
-    num_episodes = 5000
+    algorithm_name = "PPOdemo"
+    num_episodes = 10000
     actor_lr = 1e-3
     critic_lr = 1e-3
     lmbda = 0.95
     eps = 0.2
-    epochs = 5
+    epochs = 8
     device = torch.device('cuda')
     env_name = 'Snake-v0'  #'CartPole-v0'
 
@@ -168,7 +149,7 @@ if __name__ == "__main__":
 
     return_list = []
     max_reward = 0
-    for i in range(20):
+    for i in range(10):
         with tqdm(total=int(num_episodes / 10),
                   desc='Iteration %d' % i) as pbar:
             for i_episodes in range(int(num_episodes / 10)):
@@ -201,10 +182,12 @@ if __name__ == "__main__":
                     state = next_state
                     episode_return += reward
                     if i_episodes == int(num_episodes / 10) - 1:
+                        env.render()
                         time.sleep(0.1)
                 agent.update(transition_dict)
 
                 return_list.append(episode_return)
+                plot_smooth_reward(return_list, 100, env_name, algorithm_name)
                 if episode_return > max_reward:
                     max_reward = episode_return
                     agent.save_model(env_name, algorithm_name)
@@ -216,5 +199,3 @@ if __name__ == "__main__":
                         '%.3f' % np.mean(return_list[-10:])
                     })
                 pbar.update(1)
-
-    plot_smooth_reward(return_list)
