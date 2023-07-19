@@ -17,7 +17,7 @@ The snake can move in four directions: up, down, left, and right.
 
 # Algorithm
 ## Implemented algorithm
-dqn, double dqn
+dqn, ddqn, drqn
 reinforce, reinforce with baseline
 ac, ac with target, a2c, a2c with target
 ppo

@@ -19,16 +19,6 @@ class SnakeEnv(gym.Env):
         self.cell_size = 40
         self.window_size = (self.width * self.cell_size,
                             self.height * self.cell_size)
-
-        # # 初始化pygame窗口
-        # pygame.init()
-        # pygame.font.init()
-        # self.font = pygame.font.Font(None, 30)
-
-        # self.window = pygame.display.set_mode(self.window_size)
-
-        # pygame.display.set_caption("Snake Game")
-
         # 定义颜色
         self.color_bg = (255, 255, 255)
         self.color_head = (0, 120, 120)
@@ -120,7 +110,6 @@ class SnakeEnv(gym.Env):
             done = True
         elif (x, y) == self.food:
             reward = 4 + len(self.snake) * 0.1
-            # print(f"reward1={reward}")
             self.time = 1
             self.snake.insert(0, (x, y))
             self.food = self.generate_food()
@@ -130,7 +119,6 @@ class SnakeEnv(gym.Env):
             fx, fy = self.food
             d = (abs(x - fx) + abs(y - fy))
             reward = 0.1 * (2 - d) / (self.time)
-            # print(f"reward2={reward}")
             self.snake.insert(0, (x, y))
             self.snake.pop()
             self.update_grid()
@@ -143,7 +131,6 @@ class SnakeEnv(gym.Env):
         pygame.init()
         pygame.font.init()
         self.font = pygame.font.Font(None, 30)
-
         self.window = pygame.display.set_mode(self.window_size)
 
         pygame.display.set_caption("Snake Game")
