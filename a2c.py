@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import time
 import torch.nn as nn
 from rl_utils import plot_smooth_reward
+import yaml
 
 
 class CriticNet(nn.Module):
@@ -99,35 +100,21 @@ class A2C:
         self.critic_optimizer.step()
 
 
-def plot_smooth_reward(rewards, window_size=100):
-    # 计算滑动窗口平均值
-    smoothed_rewards = np.convolve(rewards,
-                                   np.ones(window_size) / window_size,
-                                   mode='valid')
-
-    # 绘制原始奖励和平滑奖励曲线
-    plt.plot(rewards, label='Raw Reward')
-    plt.plot(smoothed_rewards, label='Smoothed Reward')
-
-    # 设置图例、标题和轴标签
-    plt.legend()
-    plt.title('Smoothed Reward')
-    plt.xlabel('Episode')
-    plt.ylabel('Reward')
-
-    # 显示图像
-    plt.show()
-
-
 if __name__ == "__main__":
+    # 加载参数配置文件
+    with open('Snake-v0/A2C.yaml', 'r') as file:
+        config = yaml.safe_load(file)
 
-    gamma = 0.99
-    algorithm_name = "A2C"
-    num_episodes = 5000
-    actor_lr = 1e-3
-    critic_lr = 1e-3
-    device = torch.device('cuda')
-    env_name = 'Snake-v0'  #'CartPole-v0'
+    gamma = config['train']['gamma']
+    algorithm_name = config['train']['algorithm_name']
+    num_episodes = config['train']['num_episodes']
+    actor_lr = config['train']['actor_lr']
+    critic_lr = config['train']['critic_lr']
+    env_name = config['train']['env_name']
+    hidden_dim = config['train']['hidden_dim']
+
+    #选择设备
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # 注册环境
     gym.register(id='Snake-v0', entry_point='snake_env:SnakeEnv')
@@ -140,7 +127,7 @@ if __name__ == "__main__":
     torch.manual_seed(0)
 
     state_dim = env.observation_space.shape[0]
-    hidden_dim = 128
+
     action_dim = env.action_space.n
     agent = A2C(state_dim, hidden_dim, action_dim, actor_lr, critic_lr, gamma,
                 device)
@@ -167,7 +154,6 @@ if __name__ == "__main__":
                     action = agent.take_action(state)
                     next_state, reward, done, _ = env.step(action)
                     next_action = agent.take_action(next_state)
-                    env.render()
 
                     transition_dict['states'].append(state)
                     transition_dict['actions'].append(action)
@@ -179,6 +165,7 @@ if __name__ == "__main__":
                     state = next_state
                     episode_return += reward
                     if i_episodes == int(num_episodes / 10) - 1:
+                        env.render()
                         time.sleep(0.1)
                 agent.update(transition_dict)
 
