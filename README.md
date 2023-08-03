@@ -58,7 +58,11 @@ You can just modify the env_name from 'BipedalWalker-v3' to 'BipedalWalkerHardco
 
 ### The results
 
+#### BipedalWalker-v3
+
 ![BipedalWalker-v3](https://github.com/sunwuzhou03/rl_learning/blob/master/BipedalWalker-v3/BipedalWalker-v3.gif)
+
+#### BipedalWalkerHardcore-v3
 
 ![BipedalWalkerHardcore-v3](https://github.com/sunwuzhou03/rl_learning/blob/master/BipedalWalkerHardcore-v3/BipedalWalkerHardcore-v3.gif)
 
