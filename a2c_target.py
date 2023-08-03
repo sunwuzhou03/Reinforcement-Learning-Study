@@ -121,11 +121,11 @@ if __name__ == "__main__":
     np.random.seed(0)
     env.seed(0)
     torch.manual_seed(0)
-    gamma = 0.99
+    gamma = 0.98
     algorithm_name = "A2C_TARGET"
     num_episodes = 5000
     actor_lr = 1e-3
-    critic_lr = 1e-3
+    critic_lr = 3e-3
     tau = 5e-3
     device = torch.device('cuda')
     state_dim = env.observation_space.shape[0]
@@ -158,7 +158,6 @@ if __name__ == "__main__":
                     action = agent.take_action(state)
                     next_state, reward, done, _ = env.step(action)
                     next_action = agent.take_action(next_state)
-                    env.render()
 
                     transition_dict['states'].append(state)
                     transition_dict['actions'].append(action)
@@ -170,7 +169,9 @@ if __name__ == "__main__":
                     state = next_state
                     episode_return += reward
                     if i_episodes == int(num_episodes / 10) - 1:
-                        time.sleep(0.1)
+                        # time.sleep(0.1)
+                        env.render()
+
                 agent.update(transition_dict)
 
                 return_list.append(episode_return)

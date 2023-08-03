@@ -81,27 +81,29 @@ class AC:
         q_next = self.critic(next_states).gather(1, next_actions).view(-1, 1)
 
         y_now = (self.gamma * q_next * (1 - dones) + rewards).view(-1, 1)
-        td_delta = y_now - q_now
+        td_delta = -y_now + q_now
         log_prob = torch.log(self.actor(states).gather(1, actions))
-        actor_loss = torch.mean(-log_prob * td_delta.detach())
+        actor_loss = torch.mean(log_prob * td_delta.detach())
         critic_loss = torch.mean(F.mse_loss(y_now.detach(), q_now))
 
         self.actor_optimizer.zero_grad()
         self.critic_optimizer.zero_grad()
+
         actor_loss.backward()
         critic_loss.backward()
+
         self.actor_optimizer.step()
         self.critic_optimizer.step()
 
 
 if __name__ == "__main__":
 
-    gamma = 0.99
+    gamma = 0.98
     algorithm_name = "AC"
     num_episodes = 5000
 
-    actor_lr = 1e-3
-    critic_lr = 4e-3
+    actor_lr = 1e-4
+    critic_lr = 1e-3
     print(algorithm_name, actor_lr, critic_lr)
     device = torch.device('cuda')
 
@@ -146,7 +148,6 @@ if __name__ == "__main__":
                     action = agent.take_action(state)
                     next_state, reward, done, _ = env.step(action)
                     next_action = agent.take_action(next_state)
-                    env.render()
 
                     transition_dict['states'].append(state)
                     transition_dict['actions'].append(action)
@@ -158,7 +159,10 @@ if __name__ == "__main__":
                     state = next_state
                     episode_return += reward
                     if i_episodes == int(num_episodes / 10) - 1:
+                        env.render()
+
                         time.sleep(0.1)
+
                 agent.update(transition_dict)
 
                 return_list.append(episode_return)

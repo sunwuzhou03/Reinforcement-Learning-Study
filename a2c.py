@@ -101,17 +101,14 @@ class A2C:
 
 
 if __name__ == "__main__":
-    # 加载参数配置文件
-    with open('Snake-v0/A2C.yaml', 'r') as file:
-        config = yaml.safe_load(file)
 
-    gamma = config['train']['gamma']
-    algorithm_name = config['train']['algorithm_name']
-    num_episodes = config['train']['num_episodes']
-    actor_lr = config['train']['actor_lr']
-    critic_lr = config['train']['critic_lr']
-    env_name = config['train']['env_name']
-    hidden_dim = config['train']['hidden_dim']
+    gamma = 0.99
+    algorithm_name = "A2C"
+    num_episodes = 10000
+    actor_lr = 1e-3
+    critic_lr = 3e-3
+    env_name = 'Snake-v0'
+    hidden_dim = 128
 
     #选择设备
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -134,7 +131,7 @@ if __name__ == "__main__":
 
     return_list = []
     max_reward = 0
-    for i in range(20):
+    for i in range(10):
         with tqdm(total=int(num_episodes / 10),
                   desc='Iteration %d' % i) as pbar:
             for i_episodes in range(int(num_episodes / 10)):
