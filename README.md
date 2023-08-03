@@ -38,7 +38,7 @@ sac
 
 #### Successful results
 
-!['ppo 20*20'](gif\Snake-v1\PPO.gif)
+!['ppo 20*20'](https://github.com/sunwuzhou03/rl_learning/gif/Snake-v1\PPO.gif)
 
  You can find more successful result in gif file.  
 
@@ -58,7 +58,7 @@ You can just modify the env_name from 'BipedalWalker-v3' to 'BipedalWalkerHardco
 
 ### The results
 
-![BipedalWalker-v3](BipedalWalker-v3/BipedalWalker-v3.gif)
+![BipedalWalker-v3](https://github.com/sunwuzhou03/rl_learning/BipedalWalker-v3/BipedalWalker-v3.gif)
 
-![BipedalWalkerHardcore-v3](BipedalWalkerHardcore-v3/BipedalWalkerHardcore-v3.gif)
+![BipedalWalkerHardcore-v3](https://github.com/sunwuzhou03/rl_learning/BipedalWalkerHardcore-v3/BipedalWalkerHardcore-v3.gif)
 
