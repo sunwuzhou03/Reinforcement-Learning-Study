@@ -24,12 +24,18 @@ class PolicyNetContinuous(torch.nn.Module):
         std = F.softplus(self.fc_std(x))
         dist = Normal(mu, std)
         normal_sample = dist.rsample()  # rsample()是重参数化采样
-        log_prob = dist.log_prob(normal_sample)
+
         action = torch.tanh(normal_sample)
         # 计算tanh_normal分布的对数概率密度
-        log_prob = log_prob - torch.log(1 - torch.tanh(action).pow(2) + 1e-7)
+        log_pi = dist.log_prob(normal_sample).sum(dim=1, keepdim=True)
+        log_pi -= (
+            2 *
+            (np.log(2) - normal_sample - F.softplus(-2 * normal_sample))).sum(
+                dim=1, keepdim=True)
+
         action = action * self.action_bound
-        return action, log_prob
+
+        return action, log_pi
 
 
 class QValueNetContinuous(torch.nn.Module):
@@ -99,6 +105,7 @@ class SACContinuous:
         entropy = -log_prob
         q1_value = self.target_critic_1(next_states, next_actions)
         q2_value = self.target_critic_2(next_states, next_actions)
+
         next_value = torch.min(q1_value,
                                q2_value) + self.log_alpha.exp() * entropy
         td_target = rewards + self.gamma * next_value * (1 - dones)
@@ -124,8 +131,8 @@ class SACContinuous:
 
         # 更新两个Q网络
         td_target = self.calc_target(rewards, next_states, dones)
-        # print(states.shape)
-        # print(actions.shape)
+        # print(self.critic_1(states, actions))
+        # print(td_target.detach())
 
         critic_1_loss = torch.mean(
             F.mse_loss(self.critic_1(states, actions), td_target.detach()))
@@ -178,8 +185,8 @@ class ReplayBuffer:
 
 if __name__ == "__main__":
 
-    algorithm_name = 'SAC'
-    env_name = 'BipedalWalkerHardcore-v3'
+    algorithm_name = 'SAC_correct'
+    env_name = 'BipedalWalker-v3'
     env = gym.make(env_name)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
@@ -193,7 +200,7 @@ if __name__ == "__main__":
     actor_lr = 4e-4
     critic_lr = 4e-4
     alpha_lr = 4e-4
-    num_episodes = 10000
+    num_episodes = 1000
     hidden_dim = 256
     gamma = 0.98
     tau = 0.01  # 软更新参数
@@ -209,7 +216,7 @@ if __name__ == "__main__":
     agent = SACContinuous(state_dim, hidden_dim, action_dim, action_bound,
                           actor_lr, critic_lr, alpha_lr, target_entropy, tau,
                           gamma, device)
-    agent.load_model('BipedalWalker-v3\SACx.pth')
+    # agent.load_model('BipedalWalker-v3\SACx.pth')
     return_list = []
     max_reward = -float('inf')
     for i in range(10):
@@ -237,8 +244,6 @@ if __name__ == "__main__":
 
                     if i_episodes == int(num_episodes / 10) - 1:
                         env.render()
-                        rl_utils.plot_smooth_reward(return_list, 100, env_name,
-                                                    algorithm_name)
 
                     replay_buffer.add(state, action, reward, next_state, done)
                     state = next_state
@@ -260,6 +265,9 @@ if __name__ == "__main__":
                         break
 
                 return_list.append(episode_return)
+
+                rl_utils.plot_smooth_reward(return_list, 100, env_name,
+                                            algorithm_name)
 
                 if episode_return >= max_reward:
                     max_reward = episode_return

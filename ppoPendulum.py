@@ -177,7 +177,10 @@ if __name__ == "__main__":
                 for _ in range(max_step):
                     action = agent.take_action(state)
                     next_state, reward, done, _ = env.step(action)
+
                     next_action = agent.take_action(next_state)
+                    # print(next_action, next_state, action, state, reward)
+
                     transition_dict['states'].append(state)
                     transition_dict['actions'].append(action)
                     transition_dict['next_states'].append(next_state)

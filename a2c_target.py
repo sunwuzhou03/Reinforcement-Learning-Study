@@ -123,7 +123,7 @@ if __name__ == "__main__":
     torch.manual_seed(0)
     gamma = 0.98
     algorithm_name = "A2C_TARGET"
-    num_episodes = 5000
+    num_episodes = 10000
     actor_lr = 1e-3
     critic_lr = 3e-3
     tau = 5e-3
@@ -137,7 +137,7 @@ if __name__ == "__main__":
 
     return_list = []
     max_reward = 0
-    for i in range(20):
+    for i in range(10):
         with tqdm(total=int(num_episodes / 10),
                   desc='Iteration %d' % i) as pbar:
             for i_episodes in range(int(num_episodes / 10)):
