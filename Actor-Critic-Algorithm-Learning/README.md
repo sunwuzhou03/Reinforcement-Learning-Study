@@ -9,3 +9,13 @@ Just run the program ac.py, a2c.py or a3c.py
 # How to test
 
 Just run the test.py
+
+# The results demonstrate
+
+The fellows are only the reward curve and you can find more in the "Actor-Critic-Algorithm-Learning\CartPole-v0" directory.
+
+![reward_curve(AC)](https://github.com/sunwuzhou03/rl_learning/blob/master/Actor-Critic-Algorithm-Learning/CartPole-v0/reward_curve(AC).png) 
+
+![reward_curve(A2C)](https://github.com/sunwuzhou03/rl_learning/blob/master/Actor-Critic-Algorithm-Learning/CartPole-v0/reward_curve(A2C).png) 
+
+![reward_curve(A3C)](https://github.com/sunwuzhou03/rl_learning/blob/master/Actor-Critic-Algorithm-Learning/CartPole-v0/reward_curve(A3C).png)
