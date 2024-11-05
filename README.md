@@ -7,11 +7,9 @@ dqn, ddqn, drqn
 
 reinforce, reinforce with baseline
 
-ac, ac with target, a2c, a2c with target, a3c
+ac, ac with target, a2c, a2c with target, a3c, sac
 
 ppo, ippo, multidiscrete action ppo
-
-sac
 
 ## To-be-implemented algorithm
 
@@ -27,8 +25,6 @@ ddpg
 - custom env
 
     - Snake-0
-
-    - MultiAgentFollowV1
 
     - Walker(BipedalWalker-v3 discrete version)
 
